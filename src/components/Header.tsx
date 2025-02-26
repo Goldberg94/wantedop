@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 const Header = () => {
   const [isVisible, setIsVisible] = useState(true);
   const [prevScrollPos, setPrevScrollPos] = useState(0);
+  const [openItem, setOpenItem] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -65,20 +66,37 @@ const Header = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
+                <a 
+                  href="#gallery" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setOpenItem(openItem === 'gallery' ? null : 'gallery');
+                    document.querySelector("#gallery")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors"
+                >
                   Gallery
                 </a>
               </li>
               <li>
-                <a href="#faq" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
+                <a 
+                  href="#faq"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setOpenItem(openItem === 'faq' ? null : 'faq');
+                    document.querySelector("#faq")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors"
+                >
                   FAQ
                 </a>
               </li>
               <li>
-                <a href="#" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
-                  Contact
-                </a>
-              </li>
+  <a href="#contact" className="text-white font-bold text-xl hover:text-[#f4e4bc] transition-colors">
+    Contact
+  </a>
+</li>
+
             </ul>
           </nav>
         </div>

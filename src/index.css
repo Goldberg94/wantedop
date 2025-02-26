@@ -3,12 +3,28 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  html, body {
     font-family: 'Hanken Grotesk', system-ui, sans-serif;
     scroll-behavior: smooth;
     scroll-padding-top: 5rem;
+    background-color: #1a1b26;
   }
 }
+
+/* Ajout du background en pseudo-élément */
+.bg-radial-blur::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at center, #3B82F6 0%, transparent 70%);
+  opacity: 0.15;
+  filter: blur(120px);
+  z-index: -1;
+}
+
 
 .wanted-name {
   font-family: 'Times New Roman', Times, serif;
