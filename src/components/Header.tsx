@@ -50,7 +50,7 @@ const Header = () => {
               alt="One Piece Logo" 
               className="w-10 h-10"
             />
-            <span className="text-[#f4e4bc] text-3xl font-['Pirata_One']">Wanted Maker</span>
+            <span className="text-[#ded1bd] text-3xl font-['Pirata_One']">Wanted Maker</span>
           </div>
           
           <nav>
@@ -59,23 +59,23 @@ const Header = () => {
                 <a 
                   href="#" 
                   onClick={scrollToTop}
-                  className="text-white font-bold font-['Pirata_One'] text-xl hover:text-[#f4e4bc] transition-colors"
+                  className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors"
                 >
                   Create my Wanted Poster
                 </a>
               </li>
               <li>
-                <a href="#" className="text-white font-bold font-['Pirata_One'] text-xl hover:text-[#f4e4bc] transition-colors">
+                <a href="#" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
                   Gallery
                 </a>
               </li>
               <li>
-                <a href="#faq" className="text-white font-bold font-['Pirata_One'] text-xl hover:text-[#f4e4bc] transition-colors">
+                <a href="#faq" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
                   FAQ
                 </a>
               </li>
               <li>
-                <a href="#" className="text-white font-bold font-['Pirata_One'] text-xl hover:text-[#f4e4bc] transition-colors">
+                <a href="#" className="text-white font-bold font-hanken-grotesk text-xl hover:text-[#f4e4bc] transition-colors">
                   Contact
                 </a>
               </li>

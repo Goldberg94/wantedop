@@ -2,9 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 5rem; /* Ajustement pour le header fixe */
+@layer base {
+  html {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
 }
 
 .wanted-name {
