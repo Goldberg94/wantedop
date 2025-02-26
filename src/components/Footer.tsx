@@ -5,9 +5,6 @@ const Footer = () => {
     <footer className="bg-[rgba(15,15,25,0.6)] backdrop-blur-md py-6">
       <div className="max-w-6xl mx-auto px-4 text-center">
         <p className="text-[#f4e4bc]">Created with ❤️ for One Piece fans</p>
-        <p className="text-sm text-[#f4e4bc]/60 mt-2">
-          One Piece © Eiichiro Oda / Shueisha Inc.
-        </p>
       </div>
     </footer>
   );

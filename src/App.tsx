@@ -7,25 +7,6 @@ import { db } from './firebaseConfig'; // Import Firestore
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 import Contact from './components/Contact';
 
-const savePosterToDB = async (posterUrl) => {
-  const postersRef = collection(db, 'posters');
-
-  // Ajouter une nouvelle affiche à Firestore avec un timestamp
-  await addDoc(postersRef, { url: posterUrl, createdAt: new Date() });
-
-  // Récupérer les affiches triées par date (les plus récentes en premier)
-  const querySnapshot = await getDocs(query(postersRef, orderBy('createdAt', 'desc')));
-  const posters = querySnapshot.docs;
-
-  // Supprimer les affiches en trop si elles dépassent 40
-  if (posters.length > 40) {
-    const oldestPosters = posters.slice(40); // Prendre celles en trop
-    oldestPosters.forEach(async (poster) => {
-      await deleteDoc(doc(db, 'posters', poster.id));
-    });
-  }
-};
-
 
 type PosterVersion = 'classic' | 'holo' | 'white';
 type Rank = 'pirate' | 'marine';
@@ -110,7 +91,6 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<string | null>(null);
-  const [galleryImages, setGalleryImages] = useState([]);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const controlsCanvasRef = useRef<HTMLCanvasElement>(null);
   const templateRef = useRef<HTMLImageElement | null>(null);
@@ -651,22 +631,15 @@ function App() {
     setIsDragOver(false);
   };
 
-  const handleDownload = async () => {
-  const canvas = mainCanvasRef.current;
-  if (!canvas) return;
+  const handleDownload = () => {
+    const canvas = mainCanvasRef.current;
+    if (!canvas) return;
 
-  const posterUrl = canvas.toDataURL('image/png');
-  const link = document.createElement('a');
-  link.download = `wanted-poster-${rawName.toLowerCase().replace(/\s+/g, '-')}.png`;
-  link.href = posterUrl;
-  link.click();
-
-  // Ajouter l'affiche à la galerie locale
-  setGalleryImages((prev) => [posterUrl, ...prev]);
-
-  // Enregistrer l'affiche dans Firestore
-  await savePosterToDB(posterUrl);
-};
+    const link = document.createElement('a');
+    link.download = `wanted-poster-${rawName.toLowerCase().replace(/\s+/g, '-')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
 
   const getCursorStyle = () => {
     if (!image) {
@@ -705,7 +678,7 @@ function App() {
       <Header />
       
       <div 
-        className="fixed top-0 left-0 w-full h-screen pointer-events-none" 
+        className="fixed top-0 left-0 w-full h-screen pointer-events-none"
         style={{
           background: 'radial-gradient(circle at center, #3B82F6 0%, transparent 70%)',
           opacity: '0.15',
@@ -722,149 +695,144 @@ function App() {
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-white font-medium mb-2">Name</label>
-                  <input 
-  type="text"
-  className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] 
-  border border-[rgba(255,255,255,0.1)] 
-  rounded-lg sm:rounded-xl text-white placeholder-gray-400 
-  focus:ring-2 focus:ring-[#8B5CF6] transition-all"
-  value={rawName}
-  onChange={handleNameChange}
-  placeholder="Enter name"
-/>
-                  <div className="flex items-center gap-2 mt-2 mb-4">
-                    <input
-                      type="checkbox"
-                      id="useBullets"
-                      checked={useBullets}
-                      onChange={(e) => setUseBullets(e.target.checked)}
-                      className="rounded border-gray-400"
-                    />
-                    <label htmlFor="useBullets" className="text-sm text-gray-300">
-                      Replace spaces with • (Example: Monkey•D•Luffy)
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block text-white font-medium mb-2">
-                      Name Height ({nameHeight.toFixed(1)}x)
-                    </label>
-                    <input
-                      type="range"
-                      min="2"
-                      max="3.4"
-                      step="0.1"
-                      value={nameHeight}
-                      onChange={(e) => setNameHeight(parseFloat(e.target.value))}
-                      className="w-full accent-[#8B5CF6]"
-                    />
-                  </div>
-                </div>
+  <label className="block text-gray-300 font-medium mb-2">Name</label>
+  <input
+    type="text"
+    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
+    value={rawName}
+    onChange={handleNameChange}
+    placeholder="Enter name"
+  />
+  <div className="flex items-center gap-2 mt-2 mb-4">
+    <input
+      type="checkbox"
+      id="useBullets"
+      checked={useBullets}
+      onChange={(e) => setUseBullets(e.target.checked)}
+      className="rounded border-gray-400"
+    />
+    <label htmlFor="useBullets" className="text-sm text-gray-300">
+      Replace spaces with • (Example: Monkey•D•Luffy)
+    </label>
+  </div>
+  <div>
+    <label className="block text-white font-medium mb-2">
+      Name Height ({nameHeight.toFixed(1)}x)
+    </label>
+    <input
+      type="range"
+      min="2"
+      max="3.4"
+      step="0.1"
+      value={nameHeight}
+      onChange={(e) => setNameHeight(parseFloat(e.target.value))}
+      className="w-full accent-[#8B5CF6]"
+      style={{ cursor: 'pointer' }}
+    />
+  </div>
+</div>
 
-                <div>
-                  <label className="block text-white font-medium mb-2">Bounty (Berries)</label>
-                  <input 
-  type="number"
-  className="w-full px-4 py-3 bg-[rgba(255,255,255,0.05)] 
-  border border-[rgba(255,255,255,0.1)] 
-  rounded-lg sm:rounded-xl text-white placeholder-gray-400 
-  focus:ring-2 focus:ring-[#8B5CF6] transition-all"
-  value={bounty}
-  onChange={(e) => setBounty(e.target.value)}
-  placeholder="Enter bounty amount"
-/>
-                </div>
+<div>
+  <label className="block text-gray-300 font-medium mb-2">Bounty (Berries)</label>
+  <input 
+    type="number"
+    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
+    value={bounty}
+    onChange={(e) => setBounty(e.target.value)}
+    placeholder="Enter bounty amount"
+  />
+</div>
 
-                <div>
-                  <label className="block text-white font-medium mb-2">Upload your Photo</label>
-                  <div className="flex items-center gap-2">
-                    {!image ? (
-                      <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
-                        <Upload size={16} />
-                        {fileInputRef.current?.files?.[0] 
-                          ? getFileName(fileInputRef.current.files[0])
-                          : 'Choose File'
-                        }
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          ref={fileInputRef}
-                        />
-                      </label>
-                    ) : (
-                      <button
-                        onClick={handleDeleteImage}
-                        className="bg-red-500 text-white px-4 py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Delete Image
-                      </button>
-                    )}
-                  </div>
-                </div>
+<div>
+  <label className="block text-white font-medium mb-2">Upload your Photo</label>
+  <div className="flex items-center gap-2">
+    {!image ? (
+      <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
+        <Upload size={16} />
+        {fileInputRef.current?.files?.[0] 
+          ? getFileName(fileInputRef.current.files[0])
+          : 'Choose File'
+        }
+        <input
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleImageChange}
+          ref={fileInputRef}
+        />
+      </label>
+    ) : (
+      <button
+        onClick={handleDeleteImage}
+        className="bg-red-500 text-white px-4 py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2"
+      >
+        <Trash2 size={16} />
+        Delete Image
+      </button>
+    )}
+  </div>
+</div>
 
-                <div>
-                  <label className="block text-white font-medium mb-2">Background</label>
-                  <div className="relative">
-                    <div className="flex gap-3 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900 mb-4 px-2">
-                      <button
-                        onClick={() => selectBackground(null)}
-                        className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 flex items-center justify-center overflow-hidden ${
-                          !backgroundImage && !customBackground ? 'border-[#8B5CF6]' : 'border-gray-600'
-                        }`}
-                      >
-                        <span className="text-gray-400 text-lg">None</span>
-                      </button>
-                      {PREDEFINED_BACKGROUNDS.map((bg) => (
-                        <button
-                          key={bg.id}
-                          onClick={() => selectBackground(bg.url)}
-                          className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 overflow-hidden ${
-                            backgroundImage === bg.url ? 'border-[#8B5CF6]' : 'border-gray-600'
-                          }`}
-                        >
-                          <img 
-                            src={bg.thumbnail} 
-                            alt={`Background ${bg.id}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#1a1b26] pointer-events-none"></div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
-                      <Upload size={16} />
-                      Upload Custom
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleBackgroundUpload}
-                        ref={backgroundInputRef}
-                      />
-                    </label>
-                    <span className="text-gray-300">
-                      {customBackground ? 'Custom background selected' : ''}
+<div>
+  <label className="block text-white font-medium mb-2">Background</label>
+  <div className="relative">
+    <div className="flex gap-3 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900 mb-4 px-2">
+      <button
+        onClick={() => selectBackground(null)}
+        className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 flex items-center justify-center overflow-hidden ${
+          !backgroundImage && !customBackground ? 'border-[#8B5CF6]' : 'border-gray-600'
+        }`}
+      >
+        <span className="text-gray-400 text-lg">None</span>
+      </button>
+      {PREDEFINED_BACKGROUNDS.map((bg) => (
+        <button
+          key={bg.id}
+          onClick={() => selectBackground(bg.url)}
+          className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 overflow-hidden ${
+            backgroundImage === bg.url ? 'border-[#8B5CF6]' : 'border-gray-600'
+          }`}
+        >
+          <img 
+            src={bg.thumbnail} 
+            alt={`Background ${bg.id}`}
+            className="w-full h-full object-cover"
+          />
+        </button>
+      ))}
+    </div>
+    <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#1a1b26] pointer-events-none"></div>
+  </div>
+  <div className="flex items-center gap-2">
+    <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
+      <Upload size={16} />
+      Upload Custom
+      <input
+        type="file"
+        className="hidden"
+        accept="image/*"
+        onChange={handleBackgroundUpload}
+        ref={backgroundInputRef}
+      />
+    </label>
+    <span className="text-gray-300">
+      {customBackground ? 'Custom background selected' : ''}
                     </span>
                   </div>
                 </div>
 
                 <button 
-  onClick={handleDownload}
-  className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] 
-  text-white font-semibold p-4 rounded-xl sm:rounded-2xl 
-  flex items-center justify-center gap-2 
-  hover:opacity-90 transition-all shadow-lg">
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-  Download my Wanted Poster
-</button>
-
+                  onClick={handleDownload}
+                  className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] 
+    text-white font-semibold p-4 rounded-xl sm:rounded-2xl 
+    flex items-center justify-center gap-2 
+    hover:opacity-90 transition-all shadow-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Poster
+                </button>
               </div>
             </div>
 
@@ -917,7 +885,7 @@ function App() {
     <strong> your own wanted posters </strong> in just a few clicks!
   </p>
 
-  <h2 className="text-xl sm:text-xl font-semibold mb-4">Features:</h2>
+  <p className="text-xl sm:text-xl font-semibold mb-4">Features:</p>
   <ul className="space-y-3 text-justify">
     <li className="flex items-start gap-3">
       <span className="text-white-500 text-xl">•</span>
@@ -951,8 +919,7 @@ function App() {
   </p>
 </section>
 
-          <Gallery galleryImages={galleryImages} />
-
+          <Gallery />
 
           <section id="faq" className="mt-24">
   <h2 className="text-3xl text-center text-[#fff] mb-12 font-bold">Frequently Asked Questions</h2>
