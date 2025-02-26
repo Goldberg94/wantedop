@@ -6,6 +6,8 @@ import Gallery from './components/Gallery';
 import { db } from './firebaseConfig'; // Import Firestore
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 import Contact from './components/Contact';
+import { storage } from './firebaseConfig';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 
 type PosterVersion = 'classic' | 'holo' | 'white';
@@ -91,6 +93,8 @@ function App() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const controlsCanvasRef = useRef<HTMLCanvasElement>(null);
   const templateRef = useRef<HTMLImageElement | null>(null);
@@ -168,6 +172,16 @@ function App() {
       : rawName;
     setName(processedName.toUpperCase());
   }, [useBullets, rawName]);
+
+  // Reset upload success message after 3 seconds
+  useEffect(() => {
+    if (uploadSuccess) {
+      const timer = setTimeout(() => {
+        setUploadSuccess(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploadSuccess]);
 
   const getFileName = (file: File): string => {
     const maxLength = 20;
@@ -631,14 +645,44 @@ function App() {
     setIsDragOver(false);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const canvas = mainCanvasRef.current;
     if (!canvas) return;
 
+    // Get the canvas data URL
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    // 1. First save locally (current functionality)
     const link = document.createElement('a');
     link.download = `wanted-poster-${rawName.toLowerCase().replace(/\s+/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = dataUrl;
     link.click();
+    
+    // 2. Then upload to Firebase
+    try {
+      setIsUploading(true);
+      // Upload to Firebase Storage using the imported storage
+      const storageRef = ref(storage, `posters/${Date.now()}.png`);
+      await uploadString(storageRef, dataUrl, 'data_url');
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Save to Firestore
+      await addDoc(collection(db, "posters"), {
+        url: downloadURL,
+        name: rawName,
+        bounty: bounty,
+        createdAt: new Date()
+      });
+      
+      // Show success message
+      setUploadSuccess(true);
+      setIsUploading(false);
+    } catch (error) {
+      console.error("Error uploading poster: ", error);
+      setIsUploading(false);
+    }
   };
 
   const getCursorStyle = () => {
@@ -823,16 +867,35 @@ function App() {
 
                 <button 
                   onClick={handleDownload}
-                  className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] 
+                  disabled={isUploading}
+                  className={`w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] 
     text-white font-semibold p-4 rounded-xl sm:rounded-2xl 
     flex items-center justify-center gap-2 
-    hover:opacity-90 transition-all shadow-lg"
+    hover:opacity-90 transition-all shadow-lg ${isUploading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download Poster
+                  {isUploading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download Poster
+                    </>
+                  )}
                 </button>
+                
+                {uploadSuccess && (
+                  <div className="text-center text-green-400 mt-2 animate-pulse">
+                    Poster successfully added to the gallery!
+                  </div>
+                )}
               </div>
             </div>
 
@@ -882,7 +945,7 @@ function App() {
     <span className="font-bold">Wanted Poster Generator</span> is the ultimate tool for creating 
     <strong> realistic, high-quality </strong> One Piece-style posters. Whether you're a cosplayer, 
     a content creator, or just a fan of the series, our app makes it easy to design and personalize 
-    <strong> your own wanted posters </strong> in just a few clicks!
+    <strong> your own wanted posters </strong> <strong> your own wanted posters </strong> in just a few clicks!
   </p>
 
   <p className="text-xl sm:text-xl font-semibold mb-4">Features:</p>
@@ -1098,7 +1161,7 @@ function App() {
     </svg>
   </summary>
   <div className="p-4 pt-0 text-[#f4e4bc]">
-    Currently, the <strong>"Dead or Alive"</strong> text is fixed. However, you can <strong>customize the character’s name and bounty</strong>  
+    Currently, the <strong>"Dead or Alive"</strong> text is fixed. However, you can <strong>customize the character's name and bounty</strong>  
     to create your own unique Wanted poster.
   </div>
 </details>

@@ -1,30 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { db } from "../firebaseConfig"; // Assure-toi que le fichier firebaseConfig est bien importé
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { db } from "../firebaseConfig";
+import { collection, getDocs, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 
 function Gallery() {
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [scrollPosition, setScrollPosition] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // 🔥 Récupérer les 40 dernières affiches depuis Firestore
+  // 🔥 Use real-time updates with onSnapshot
   useEffect(() => {
-    const fetchPosters = async () => {
-      try {
-        const postersRef = collection(db, "posters");
-        const q = query(postersRef, orderBy("createdAt", "desc"), limit(40));
-        const querySnapshot = await getDocs(q);
+    const postersRef = collection(db, "posters");
+    const q = query(postersRef, orderBy("createdAt", "desc"), limit(40));
+    
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const images = querySnapshot.docs.map((doc) => doc.data().url);
+      setGalleryImages(images);
+    }, (error) => {
+      console.error("Error listening to posters: ", error);
+    });
 
-        // Extraire les URLs des affiches
-        const images = querySnapshot.docs.map((doc) => doc.data().url);
-        setGalleryImages(images);
-      } catch (error) {
-        console.error("Error fetching posters: ", error);
-      }
-    };
-
-    fetchPosters();
+    // Clean up listener on component unmount
+    return () => unsubscribe();
   }, []);
 
   const handleScroll = (direction: "left" | "right") => {
