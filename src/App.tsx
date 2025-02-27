@@ -1,14 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Skull, Upload, Trash2 } from 'lucide-react';
+import { Upload, Trash2, X } from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import Gallery from './components/Gallery';
-import { db } from './firebaseConfig'; // Import Firestore
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 import Contact from './components/Contact';
-import { storage } from './firebaseConfig';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-
+import RichTextDescription from './components/RichTextDescription';
+import FAQ from './components/FAQ';
+import TermsConditions from './components/TermsConditions';
 
 type PosterVersion = 'classic' | 'holo' | 'white';
 type Rank = 'pirate' | 'marine';
@@ -90,11 +87,12 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastMouseEvent, setLastMouseEvent] = useState<MouseEvent | null>(null);
   const [nameHeight, setNameHeight] = useState(3.2);
+  const [nameWeight, setNameWeight] = useState(1.0);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [customBackground, setCustomBackground] = useState<string | null>(null);
-  const [openItem, setOpenItem] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const controlsCanvasRef = useRef<HTMLCanvasElement>(null);
   const templateRef = useRef<HTMLImageElement | null>(null);
@@ -103,6 +101,7 @@ function App() {
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const backgroundsScrollRef = useRef<HTMLDivElement>(null);
   const CANVAS_WIDTH = 2000;
   const CANVAS_HEIGHT = 2828;
   const MAX_NAME_WIDTH = 1460;
@@ -118,6 +117,17 @@ function App() {
     left: CANVAS_WIDTH * 0.08,
     right: CANVAS_WIDTH * 0.92
   };
+
+  useEffect(() => {
+    // Check if URL has #terms hash or /terms path
+    if (window.location.hash === '#terms' || window.location.pathname === '/terms') {
+      setShowTerms(true);
+      // Scroll to terms section
+      setTimeout(() => {
+        document.getElementById('terms')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, []);
 
   useEffect(() => {
     const template = new Image();
@@ -383,7 +393,7 @@ function App() {
 
   useEffect(() => {
     drawMainCanvas();
-  }, [name, bounty, imagePosition, imageScale, isDragOver, nameHeight, backgroundImage, customBackground]);
+  }, [name, bounty, imagePosition, imageScale, isDragOver, nameHeight, nameWeight, backgroundImage, customBackground]);
 
   useEffect(() => {
     drawControls();
@@ -511,14 +521,18 @@ function App() {
 
     const spacedText = text.split('').join('\u200A');
     let textWidth = ctx.measureText(spacedText).width;
-    let scale = 1;
-
-    if (textWidth > MAX_NAME_WIDTH) {
-      scale = MAX_NAME_WIDTH / textWidth;
+    
+    // First apply the nameWeight to get the desired width
+    let desiredWidth = textWidth * nameWeight;
+    
+    // Then check if it exceeds MAX_NAME_WIDTH and scale down if needed
+    let finalScaleX = nameWeight;
+    if (desiredWidth > MAX_NAME_WIDTH) {
+      finalScaleX = MAX_NAME_WIDTH / textWidth;
     }
 
     ctx.translate(CANVAS_WIDTH / 2, NAME_Y_POSITION);
-    ctx.scale(scale, nameHeight);
+    ctx.scale(finalScaleX, nameHeight);
 
     if (text.includes('•')) {
       const chars = spacedText.split('');
@@ -649,38 +663,36 @@ function App() {
     const canvas = mainCanvasRef.current;
     if (!canvas) return;
 
-    // Get the canvas data URL
-    const dataUrl = canvas.toDataURL('image/png');
-    
-    // 1. First save locally (current functionality)
-    const link = document.createElement('a');
-    link.download = `wanted-poster-${rawName.toLowerCase().replace(/\s+/g, '-')}.png`;
-    link.href = dataUrl;
-    link.click();
-    
-    // 2. Then upload to Firebase
+    // Set uploading state
+    setIsUploading(true);
+
     try {
-      setIsUploading(true);
-      // Upload to Firebase Storage using the imported storage
-      const storageRef = ref(storage, `posters/${Date.now()}.png`);
-      await uploadString(storageRef, dataUrl, 'data_url');
+      // Get the canvas data URL
+      const dataUrl = canvas.toDataURL('image/png');
       
-      // Get the download URL
-      const downloadURL = await getDownloadURL(storageRef);
+      // Create a download link
+      const link = document.createElement('a');
+      link.download = `wanted-poster-${rawName.toLowerCase().replace(/\s+/g, '-')}.png`;
+      link.href = dataUrl;
+      link.click();
       
-      // Save to Firestore
-      await addDoc(collection(db, "posters"), {
-        url: downloadURL,
-        name: rawName,
-        bounty: bounty,
-        createdAt: new Date()
-      });
-      
-      // Show success message
+      // Show success message and reset uploading state
       setUploadSuccess(true);
       setIsUploading(false);
+      
+      // Dispatch a custom event to increment the poster count
+      const event = new CustomEvent('posterDownloaded');
+      window.dispatchEvent(event);
+      
+      // Initialize the global counter if it doesn't exist yet
+      if (!localStorage.getItem('globalPosterCount')) {
+        localStorage.setItem('globalPosterCount', '1');
+      } else {
+        const currentCount = parseInt(localStorage.getItem('globalPosterCount') || '0', 10);
+        localStorage.setItem('globalPosterCount', (currentCount + 1).toString());
+      }
     } catch (error) {
-      console.error("Error uploading poster: ", error);
+      console.error("Error downloading poster: ", error);
       setIsUploading(false);
     }
   };
@@ -717,6 +729,29 @@ function App() {
     return '';
   };
 
+  // If we're showing the Terms page, render only that
+  if (showTerms) {
+    return (
+      <div className="min-h-screen bg-[#1a1b26] relative overflow-hidden flex flex-col">
+        <Header />
+        <div 
+          className="fixed top-0 left-0 w-full h-screen pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle at center, #3B82F6 0%, transparent 70%)',
+            opacity: '0.15',
+            filter: 'blur(120px)'
+          }}
+        />
+        <main className="flex-1 pt-24 pb-8 px-4 relative">
+          <div className="max-w-6xl mx-auto">
+            <TermsConditions />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#1a1b26] relative overflow-hidden flex flex-col">
       <Header />
@@ -739,139 +774,164 @@ function App() {
               
               <div className="space-y-6">
                 <div>
-  <label className="block text-gray-300 font-medium mb-2">Name</label>
-  <input
-    type="text"
-    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
-    value={rawName}
-    onChange={handleNameChange}
-    placeholder="Enter name"
-  />
-  <div className="flex items-center gap-2 mt-2 mb-4">
-    <input
-      type="checkbox"
-      id="useBullets"
-      checked={useBullets}
-      onChange={(e) => setUseBullets(e.target.checked)}
-      className="rounded border-gray-400"
-    />
-    <label htmlFor="useBullets" className="text-sm text-gray-300">
-      Replace spaces with • (Example: Monkey•D•Luffy)
-    </label>
-  </div>
-  <div>
-    <label className="block text-white font-medium mb-2">
-      Name Height ({nameHeight.toFixed(1)}x)
-    </label>
-    <input
-      type="range"
-      min="2"
-      max="3.4"
-      step="0.1"
-      value={nameHeight}
-      onChange={(e) => setNameHeight(parseFloat(e.target.value))}
-      className="w-full accent-[#8B5CF6]"
-      style={{ cursor: 'pointer' }}
-    />
-  </div>
-</div>
-
-<div>
-  <label className="block text-gray-300 font-medium mb-2">Bounty (Berries)</label>
-  <input 
-    type="number"
-    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
-    value={bounty}
-    onChange={(e) => setBounty(e.target.value)}
-    placeholder="Enter bounty amount"
-  />
-</div>
-
-<div>
-  <label className="block text-white font-medium mb-2">Upload your Photo</label>
-  <div className="flex items-center gap-2">
-    {!image ? (
-      <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
-        <Upload size={16} />
-        {fileInputRef.current?.files?.[0] 
-          ? getFileName(fileInputRef.current.files[0])
-          : 'Choose File'
-        }
-        <input
-          type="file"
-          className="hidden"
-          accept="image/*"
-          onChange={handleImageChange}
-          ref={fileInputRef}
-        />
-      </label>
-    ) : (
-      <button
-        onClick={handleDeleteImage}
-        className="bg-red-500 text-white px-4 py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2"
-      >
-        <Trash2 size={16} />
-        Delete Image
-      </button>
-    )}
-  </div>
-</div>
-
-<div>
-  <label className="block text-white font-medium mb-2">Background</label>
-  <div className="relative">
-    <div className="flex gap-3 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900 mb-4 px-2">
-      <button
-        onClick={() => selectBackground(null)}
-        className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 flex items-center justify-center overflow-hidden ${
-          !backgroundImage && !customBackground ? 'border-[#8B5CF6]' : 'border-gray-600'
-        }`}
-      >
-        <span className="text-gray-400 text-lg">None</span>
-      </button>
-      {PREDEFINED_BACKGROUNDS.map((bg) => (
-        <button
-          key={bg.id}
-          onClick={() => selectBackground(bg.url)}
-          className={`shrink-0 w-24 sm:w-32 h-16 sm:h-20 rounded-lg border-2 overflow-hidden ${
-            backgroundImage === bg.url ? 'border-[#8B5CF6]' : 'border-gray-600'
-          }`}
-        >
-          <img 
-            src={bg.thumbnail} 
-            alt={`Background ${bg.id}`}
-            className="w-full h-full object-cover"
-          />
-        </button>
-      ))}
-    </div>
-    <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#1a1b26] pointer-events-none"></div>
-  </div>
-  <div className="flex items-center gap-2">
-    <label className="cursor-pointer bg-[#374151] text-white px-4 py-3 rounded-xl hover:bg-[#4B5563] transition-colors flex items-center gap-2">
-      <Upload size={16} />
-      Upload Custom
-      <input
-        type="file"
-        className="hidden"
-        accept="image/*"
-        onChange={handleBackgroundUpload}
-        ref={backgroundInputRef}
-      />
-    </label>
-    <span className="text-gray-300">
-      {customBackground ? 'Custom background selected' : ''}
-                    </span>
+                  <label className="block text-gray-300 font-medium mb-2">Name</label>
+                  <input
+                    type="text"
+                    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
+                    value={rawName}
+                    onChange={handleNameChange}
+                    placeholder="Enter name"
+                  />
+                  <div className="flex items-center gap-2 mt-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id="useBullets"
+                      checked={useBullets}
+                      onChange={(e) => setUseBullets(e.target.checked)}
+                      className="rounded border-gray-400"
+                    />
+                    <label htmlFor="useBullets" className="text-sm text-gray-300">
+                      Replace spaces with • (Example: Monkey•D•Luffy)
+                    </label>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-white font-medium mb-2">
+                        Name Height ({nameHeight.toFixed(1)}x)
+                      </label>
+                      <input
+                        type="range"
+                        min="2"
+                        max="3.4"
+                        step="0.1"
+                        value={nameHeight}
+                        onChange={(e) => setNameHeight(parseFloat(e.target.value))}
+                        className="w-full h-auto accent-[#8B5CF6]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-white font-medium mb-2">
+                        Name Width ({nameWeight.toFixed(1)}x)
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.5"
+                        step="0.1"
+                        value={nameWeight}
+                        onChange={(e) => setNameWeight(parseFloat(e.target.value))}
+                        className="w-full h-auto accent-[#8B5CF6]"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <button 
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">Bounty</label>
+                  <input
+                    type="text"
+                    className="w-full p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
+                    value={bounty}
+                    onChange={(e) => setBounty(e.target.value)}
+                    placeholder="Enter bounty amount"
+                  />
+                </div>
+
+                {/* Upload Photo Button */}
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">Photo</label>
+                  <div className="flex flex-col gap-4">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white p-3 flex items-center justify-center gap-2 hover:bg-[#4B5563] transition-colors"
+                    >
+                      <Upload size={20} />
+                      Upload Photo
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    {image && (
+                      <button
+                        onClick={handleDeleteImage}
+                        className="w-full bg-red-500 text-white p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 size={20} />
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">Background</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Horizontal scrolling background container with fade effect */}
+                    <div className="relative">
+                      <div 
+                        ref={backgroundsScrollRef}
+                        className="flex overflow-x-auto pb-2 scrollbar-hide"
+                        style={{ 
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none'
+                        }}
+                      >
+                        {/* None option as a thumbnail */}
+                        <button
+                          onClick={() => selectBackground(null)}
+                          className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex flex-col items-center justify-center mr-2 ${!backgroundImage && !customBackground ? 'border-2 border-[#8B5CF6] bg-[#8B5CF6]/20' : 'border border-gray-600 bg-[rgba(255,255,255,0.1)]'}`}
+                          title="None"
+                        >
+                          <X size={24} className="text-white mb-1" />
+                          <span className="text-xs text-white">None</span>
+                        </button>
+                        
+                        {/* Predefined backgrounds */}
+                        {PREDEFINED_BACKGROUNDS.map((bg) => (
+                          <button
+                            key={bg.id}
+                            onClick={() => selectBackground(bg.url)}
+                            className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden mr-2 ${backgroundImage === bg.url ? 'border-2 border-[#8B5CF6]' : 'border border-gray-600'}`}
+                            title={bg.name}
+                          >
+                            <img src={bg.thumbnail} alt={bg.name} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                      {/* Fade effect on the right side */}
+                      <div 
+                        className="absolute top-0 right-0 h-full w-16 pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(to right, rgba(30, 31, 43, 0), rgba(30, 31, 43, 1))'
+                        }}
+                      ></div>
+                    </div>
+                    
+                    <button
+                      onClick={() => backgroundInputRef.current?.click()}
+                      className="p-3 bg-[rgba(255,255,255,0.1)] backdrop-blur-md border border-gray-600 rounded-lg text-white flex items-center justify-center gap-2 hover:bg-[#4B5563] transition-colors"
+                    >
+                      <Upload size={20} />
+                      Upload Custom Background
+                    </button>
+                    <input
+                      ref={backgroundInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleBackgroundUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+
+                <button
                   onClick={handleDownload}
                   disabled={isUploading}
-                  className={`w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] 
-    text-white font-semibold p-4 rounded-xl sm:rounded-2xl 
-    flex items-center justify-center gap-2 
-    hover:opacity-90 transition-all shadow-lg ${isUploading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`w-full bg-gradient-to-r from-[#8B5CF6] to-[#6D28D9] text-white font-semibold p-4 rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg ${isUploading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   {isUploading ? (
                     <>
@@ -879,7 +939,7 @@ function App() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Uploading...
+                      Generating...
                     </>
                   ) : (
                     <>
@@ -890,330 +950,56 @@ function App() {
                     </>
                   )}
                 </button>
-                
+
                 {uploadSuccess && (
-                  <div className="text-center text-green-400 mt-2 animate-pulse">
-                    Poster successfully added to the gallery!
+                  <div className="text-center text-green-400">
+                    Poster downloaded successfully!
                   </div>
                 )}
               </div>
             </div>
 
-            <div 
-              className="relative w-full" 
-              style={{ aspectRatio: "2000/2828" }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <canvas
-                ref={mainCanvasRef}
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
-                className={`w-full h-full absolute top-0 left-0 ${getCursorStyle()}`}
-                onClick={handleCanvasClick}
-              />
-              <canvas
-                ref={controlsCanvasRef}
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
-                className="w-full h-full absolute top-0 left-0 pointer-events-none"
-              />
+            <div className="relative">
+              <div
+                className={`relative ${getCursorStyle()}`}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <canvas
+                  ref={mainCanvasRef}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  className="w-full h-auto"
+                  onClick={handleCanvasClick}
+                />
+                <canvas
+                  ref={controlsCanvasRef}
+                  width={CANVAS_WIDTH}
+                  height={CANVAS_HEIGHT}
+                  className="absolute top-0 left-0 w-full h-auto pointer-events-none"
+                />
+                
+                {image && (
+                  <button
+                    onClick={handleDeleteImage}
+                    className="absolute top-4 right-4 bg-red-500 text-white p-3 rounded-full hover:bg-red-600 transition-colors"
+                    title="Remove image"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-          <section className="max-w-6xl mx-auto px-6 sm:px-12 lg:px-16 text-white text-sm leading-relaxed">
-  <h1 className="text-xl sm:text-xl font-semibold mb-4 mt-16">
-    Create Your Own Custom One Piece Wanted Posters!
-  </h1>
 
-  <p className="text-justify mb-2">
-    You can now design your own <span className="font-bold">One Piece</span>-inspired 
-    <span className="font-bold"> Wanted posters</span>, just like in the anime! Bring your imagination 
-    to life with customizable templates that let you create posters featuring your favorite characters, 
-    original creations, or even yourself!
-  </p>
-
-  <p className="text-justify mb-2">
-    Are you a <span className="font-bold">One Piece</span> fan looking to make your own bounty posters?
-  </p>
-
-  <p className="text-justify mb-8">
-    <span className="font-bold">Wanted Poster Generator</span> is the ultimate tool for creating 
-    <strong> realistic, high-quality </strong> One Piece-style posters. Whether you're a cosplayer, 
-    a content creator, or just a fan of the series, our app makes it easy to design and personalize 
-    <strong> your own wanted posters </strong> <strong> your own wanted posters </strong> in just a few clicks!
-  </p>
-
-  <p className="text-xl sm:text-xl font-semibold mb-4">Features:</p>
-  <ul className="space-y-3 text-justify">
-    <li className="flex items-start gap-3">
-      <span className="text-white-500 text-xl">•</span>
-      <span><strong>Authentic Design:</strong> Create posters that look just like the official bounty posters from 
-      <em> One Piece</em>. Adjust the layout, fonts, and details to match the anime's iconic style.</span>
-    </li>
-    <li className="flex items-start gap-3">
-      <span className="text-white-500 text-xl">•</span>
-      <span><strong>Unlimited Customization:</strong> Personalize every element, including the 
-      <span className="font-bold"> name</span>, <span className="font-bold"> bounty amount</span>, 
-      <span className="font-bold"> photo</span>, and <span className="font-bold"> Marine insignia</span>. 
-      Add your own text, choose your poster's background, and even edit the <strong>"Dead or Alive"</strong> status!</span>
-    </li>
-    <li className="flex items-start gap-3">
-      <span className="text-white-500 text-xl">•</span>
-      <span><strong>Share & Print:</strong> Once your masterpiece is ready, share it with your friends on 
-      social media or print it in high resolution to display in your room.</span>
-    </li>
-    <li className="flex items-start gap-3">
-      <span className="text-white-500 text-xl">•</span>
-      <span><strong>Community & Inspiration:</strong> Join a passionate <span className="font-bold">One Piece</span> 
-      community and browse thousands of fan-made posters. Get inspired, share your creations, and bring your 
-      <em> One Piece</em> dreams to life!</span>
-    </li>
-  </ul>
-
-  <p className="text-justify mt-8">
-    Unleash your creativity and step into the world of <span className="font-bold">One Piece</span> with the 
-    <strong> Wanted Poster Generator</strong>! Whether for fun, gifts, or social media, our app gives you all the tools 
-    to craft the perfect bounty poster. Start creating your custom One Piece Wanted posters today! 🏴‍☠️🔥
-  </p>
-</section>
-
-          <Gallery />
-
-          <section id="faq" className="mt-24">
-  <h2 className="text-3xl text-center text-[#fff] mb-12 font-bold">Frequently Asked Questions</h2>
-  <div className="max-w-3xl mx-auto space-y-3">
-
-    {/* Supported formats */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'formats'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'formats' ? null : 'formats')
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">What image formats are supported?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    You can upload images in <strong>JPG, PNG, and WEBP</strong> formats. For the best results, use a high-resolution image with a clean background.
-  </div>
-</details>
-
-    {/* Adjusting image size and position */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'size'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'size' ? null : 'size');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I adjust my image's size and position?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Yes! After uploading your image, you can <strong>move, resize, and zoom</strong> to ensure a perfect fit within the poster frame.
-  </div>
-</details>
-
-
-    {/* Poster styles */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'styles'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'styles' ? null : 'styles');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">What Wanted poster styles are available?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    We offer several styles:
-    <ul className="list-disc pl-5 mt-2 space-y-1">
-      <li><strong>Classic</strong> (aged paper effect)</li>
-      <li><strong>Holo</strong> (shiny and modern)</li>
-      <li><strong>White Edition</strong> (clean, minimalist look)</li>
-    </ul>
-  </div>
-</details>
-
-{/* Background options */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'backgrounds'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'backgrounds' ? null : 'backgrounds');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">What backgrounds can I choose from?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    You can select from One Piece-inspired locations, including:
-    <ul className="list-disc pl-5 mt-2 space-y-1">
-      <li><strong>Wano Kuni</strong></li>
-      <li><strong>Dressrosa</strong></li>
-      <li><strong>Skypiea</strong></li>
-      <li><strong>Sabaody</strong></li>
-      <li><strong>Ohara</strong></li>
-      <li><strong>Water 7</strong></li>
-    </ul>
-    You can also <strong>upload your own background</strong> for a fully customized look!
-  </div>
-</details>
-
-    {/* File format and resolution */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'format'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'format' ? null : 'format');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">What's the output format and quality?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Your poster will be downloaded in <strong>high-resolution PNG format (2000x2828 px)</strong>, perfect for sharing or printing.
-  </div>
-</details>
-
-{/* Printing the poster */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'print'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'print' ? null : 'print');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I print my Wanted poster?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Yes! You can print your poster on <strong>A3/A4 paper, photo paper, or even a t-shirt</strong>.  
-    Be sure to use a <strong>high-resolution image</strong> for the best results.
-  </div>
-</details>
-
-{/* Sharing on social media */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'social'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'social' ? null : 'social');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I share my Wanted poster on social media?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Absolutely! Share your Wanted poster on <strong>Instagram, TikTok, Twitter, or Facebook</strong>.  
-    Use the hashtag <strong>#WantedOnePieceMaker</strong> for a chance to be featured!
-  </div>
-</details>
-
-{/* Custom text options */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'customText'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'customText' ? null : 'customText');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I add custom text to my poster?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Currently, the <strong>"Dead or Alive"</strong> text is fixed. However, you can <strong>customize the character's name and bounty</strong>  
-    to create your own unique Wanted poster.
-  </div>
-</details>
-
-{/* Editing after download */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'edit'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'edit' ? null : 'edit');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I edit my poster after downloading it?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    If you need to make changes, simply <strong>return to the editor</strong>, adjust your settings,  
-    and download a new version.
-  </div>
-</details>
-
-{/* Using as a personalized gift */}
-<details 
-  className="group bg-[rgba(15,15,25,0.6)] backdrop-blur-md rounded-xl"
-  open={openItem === 'gift'}
-  onClick={(e) => {
-    e.preventDefault();
-    setOpenItem(openItem === 'gift' ? null : 'gift');
-  }}
->
-  <summary className="flex items-center justify-between p-4 cursor-pointer">
-    <h3 className="text-xl text-white">Can I use this as a personalized gift?</h3>
-    <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="#fff">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </summary>
-  <div className="p-4 pt-0 text-[#f4e4bc]">
-    Yes! A custom Wanted poster makes a <strong>perfect gift for One Piece fans</strong> or  
-    a unique surprise for a <strong>birthday, special occasion, or even as a joke</strong>.
-  </div>
-</details>
-
-  </div>
-</section>
-
+          <RichTextDescription />
+          <FAQ />
           <Contact />
-
-
         </div>
       </main>
       <Footer />

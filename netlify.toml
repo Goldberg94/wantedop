@@ -1,0 +1,23 @@
+# Netlify configuration file
+
+[build]
+  # Directory to publish (the build output)
+  publish = "dist"
+  # Build command
+  command = "npm run build"
+
+# Redirects and rewrites
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+
+# Headers to set
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -1,18 +1,28 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="google-site-verification" content="cl7qOmvzVs_KhvQb-KzlDSxlWd8-REI2tMsxJr" />
-    <title>One Piece Wanted Poster Maker – Make Your Own</title>
-    <meta name="description" content="Create a custom One Piece Wanted poster in seconds for free! Upload your photo, choose a bounty and generate a unique design with our Wanted template." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Margarine&family=Pirata+One&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root">
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { JSDOM } from 'jsdom';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Function to create static HTML with SEO content
+async function generateStaticHTML() {
+  console.log('Generating static HTML for SEO...');
+  
+  try {
+    // Read the built index.html file
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    const htmlContent = fs.readFileSync(indexPath, 'utf8');
+    
+    // Create a DOM from the HTML content
+    const dom = new JSDOM(htmlContent);
+    const { document } = dom.window;
+    
+    // Get the root element where React will mount
+    const rootElement = document.getElementById('root');
+    
+    // Add static HTML content for SEO
+    rootElement.innerHTML = `
       <!-- This content will be replaced by React but provides SEO content for crawlers -->
       <header class="fixed top-0 left-0 right-0 z-50 bg-[rgba(15,15,25,0.6)] backdrop-blur-md py-4">
         <div class="max-w-6xl mx-auto px-4">
@@ -145,7 +155,153 @@
           </div>
         </div>
       </footer>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+    `;
+    
+    // Create terms directory and page
+    const termsDir = path.join(__dirname, 'dist', 'terms');
+    if (!fs.existsSync(termsDir)) {
+      fs.mkdirSync(termsDir, { recursive: true });
+    }
+    
+    // Clone the DOM for terms page
+    const termsDom = new JSDOM(htmlContent);
+    const termsDocument = termsDom.window.document;
+    const termsRoot = termsDocument.getElementById('root');
+    
+    // Add terms content
+    termsRoot.innerHTML = `
+      <header class="fixed top-0 left-0 right-0 z-50 bg-[rgba(15,15,25,0.6)] backdrop-blur-md py-4">
+        <div class="max-w-6xl mx-auto px-4">
+          <div class="flex items-center justify-center md:justify-between">
+            <a href="/" class="flex items-center gap-2">
+              <img src="https://cdn.shopify.com/s/files/1/0665/3404/7973/files/Berries_Logo2.png" alt="One Piece Logo" class="w-10 h-10" />
+              <span class="text-[#dfd0bd] text-3xl font-['Pirata_One']">Wanted Maker</span>
+            </a>
+            <nav class="hidden md:block">
+              <ul class="flex items-center gap-6">
+                <li><a href="/" class="text-white font-bold font-hanken-grotesk text-xl">Create a Wanted Poster</a></li>
+                <li><a href="/#faq" class="text-white font-bold font-hanken-grotesk text-xl">FAQ</a></li>
+                <li><a href="/#contact" class="text-white font-bold font-hanken-grotesk text-xl">Contact</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+      
+      <main class="flex-1 pt-24 pb-8 px-4 relative">
+        <div class="max-w-6xl mx-auto">
+          <section id="terms" class="py-12">
+            <div class="container mx-auto px-4">
+              <div class="max-w-4xl mx-auto space-y-8 text-white">
+                <div>
+                  <h1 class="text-2xl font-bold text-white mb-4">Terms and Conditions</h1>
+                  <p class="text-gray-300">
+                    Welcome to Wanted Maker. These terms and conditions govern your use of our website (wanted-onepiece.com) and services. By accessing or using 
+                    our website, you agree to be bound by these terms. Please read them carefully before using our service.
+                  </p>
+                </div>
+
+                <div>
+                  <h2 class="text-xl font-semibold text-white mb-2">Introduction</h2>
+                  <p class="text-gray-300">
+                    Our service allows you to create custom wanted posters using our templates and the design tools available on our platform to create your customized creations.
+                  </p>
+                  <p class="mt-2 text-gray-300">
+                    <strong class="text-white">Platform Accessibility:</strong> Our service is accessible via our website. By using this service, you agree to comply 
+                    with these terms of use and acknowledge that you have read and understood our privacy policy.
+                  </p>
+                </div>
+
+                <div>
+                  <h2 class="text-xl font-semibold text-white mb-2">Service Usage</h2>
+                  <p class="text-gray-300">
+                    <strong class="text-white">Age Requirement:</strong> Children may not access or use the service unless their use is explicitly authorized by a parent, 
+                    guardian, or other authorized adult (such as a teacher) who agrees to be bound by these terms.
+                  </p>
+                  <p class="mt-2 text-gray-300">
+                    <strong class="text-white">Service Access:</strong> Subject to your compliance with these terms, you are granted a non-exclusive, limited, 
+                    non-transferable, and revocable license to access and use the service for personal or non-commercial purposes. 
+                    We reserve all rights not expressly granted under these terms.
+                  </p>
+                </div>
+
+                <div>
+                  <h2 class="text-xl font-semibold text-white mb-2">Data Security and Privacy</h2>
+                  <p class="text-gray-300">
+                    <strong class="text-white">Data Collection:</strong> When you use our platform, we collect the following types of data:
+                  </p>
+                  <ul class="list-disc pl-5 mt-2 space-y-1 text-gray-300">
+                    <li>
+                      <strong class="text-white">Design Data:</strong> If you choose to share your poster in our gallery, we record the design and text of your poster 
+                      in our database for public display.
+                    </li>
+                    <li>
+                      <strong class="text-white">Order Details:</strong> When you place an order, we collect your contact information, including your name, address, 
+                      and email, to process and ship your order.
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h2 class="text-xl font-semibold text-white mb-2">Contact Us</h2>
+                  <p class="text-gray-300">
+                    For any other inquiries, you can send us an email via our contact form or directly at hello@cartoontoi.fr.
+                  </p>
+                </div>
+
+                <div>
+                  <h2 class="text-xl font-semibold text-white mb-2">Website Information</h2>
+                  <p class="text-gray-300">
+                    <strong class="text-white">Website Name:</strong> wanted-onepiece.com
+                  </p>
+                  <p class="text-gray-300">
+                    <strong class="text-white">Business Name:</strong> Wanted Maker
+                  </p>
+                  <p class="text-gray-300">
+                    <strong class="text-white">Last Updated:</strong> ${new Date().toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+      
+      <footer class="bg-[#1a1b26] border-t border-[rgba(255,255,255,0.1)] py-12">
+        <div class="max-w-6xl mx-auto px-6">
+          <div class="flex flex-col md:flex-row items-center justify-between mb-8">
+            <div class="flex items-center gap-2 mb-6 md:mb-0">
+              <img src="https://cdn.shopify.com/s/files/1/0665/3404/7973/files/Berries_Logo2.png" alt="One Piece Logo" class="w-10 h-10" />
+              <span class="text-[#ded1bd] text-3xl font-['Pirata_One']">Wanted Maker</span>
+            </div>
+          </div>
+          <div class="text-center mt-8 text-gray-500 text-xs">
+            <p>Created for One Piece fans. This site is not affiliated with Toei Animation or Eiichiro Oda.</p>
+          </div>
+        </div>
+      </footer>
+    `;
+    
+    // Update title and meta tags for terms page
+    const termsTitle = termsDocument.querySelector('title');
+    if (termsTitle) {
+      termsTitle.textContent = 'Terms and Conditions - One Piece Wanted Poster Maker';
+    }
+    
+    const termsDescription = termsDocument.querySelector('meta[name="description"]');
+    if (termsDescription) {
+      termsDescription.setAttribute('content', 'Terms and conditions for using the One Piece Wanted Poster Maker. Read our policies regarding usage, privacy, and more.');
+    }
+    
+    // Write the updated HTML files
+    fs.writeFileSync(indexPath, dom.serialize());
+    fs.writeFileSync(path.join(termsDir, 'index.html'), termsDom.serialize());
+    
+    console.log('Static HTML generation completed successfully!');
+  } catch (error) {
+    console.error('Error generating static HTML:', error);
+    process.exit(1);
+  }
+}
+
+generateStaticHTML();
